@@ -1,0 +1,24 @@
+[
+  {
+    "title": "Welcome to the Blog: What to Expect",
+    "slug": "welcome-to-the-blog-what-to-expect",
+    "date": "2026-08-08",
+    "tags": [
+      "meta",
+      "notes"
+    ],
+    "excerpt": "Why this blog exists, what gets filed here, and what never will."
+  },
+  {
+    "title": "Multiple Vulnerabilities in GX Earth GPON Routers (CVE-2026-45431/45432/45433)",
+    "slug": "gpon-router-vulnerabilities",
+    "date": "2026-08-08",
+    "tags": [
+      "research",
+      "hardware",
+      "gpon",
+      "cve"
+    ],
+    "excerpt": "A writeup of the command injection, cleartext credential exposure, and hardcoded key issues I found in the GX Earth 2022 ONT and reported through CERT-In."
+  }
+]

