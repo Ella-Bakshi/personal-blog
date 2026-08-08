@@ -130,7 +130,7 @@ The chain is straightforward: enumerate the ISP ranges for the TR-069 port to id
 
 ## Disclosure and CVEs
 
-I reported this to NCIIPC on 28 December 2024. It went through coordinated disclosure with CERT-In, the vendor released fixed firmware, and the advisory and CVEs were published on 4 June 2026.
+I reported this to CERT-In on 20 January 2026. The vendor released fixed firmware, and the advisory and CVEs were published on 4 June 2026.
 
 **CERT-In advisory:** [CIVN-2026-0288: Multiple Vulnerabilities in GX Earth ONT Models](https://www.cert-in.org.in/s2cMainServlet?pageid=PUBVLNOTES01&VLCODE=CIVN-2026-0288)
 
