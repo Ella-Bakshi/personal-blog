@@ -110,7 +110,7 @@ def build() -> None:
         ))
 
     index = fill(load_template("index.html"), {
-        "ENTRIES": "\n".join(entries) if entries else '        <p class="no-results" style="display:block">— Archive empty. Run <code>python3 new_post.py</code> —</p>',
+        "ENTRIES": "\n".join(entries) if entries else '        <p class="no-results is-shown">— Archive empty. Run <code>python3 new_post.py</code> —</p>',
         "TAG_BUTTONS": tag_buttons,
         "TOTAL": str(total).zfill(2),
         "UPDATED": human_date(datetime.now().date().isoformat()),
