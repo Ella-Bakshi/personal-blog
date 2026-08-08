@@ -25,4 +25,4 @@ therefore also add a post without running anything locally — just drop a
 properly formatted `.md` file into `posts/` and push. The site updates itself within a minute or two.
 
 ---
-© 2026 Anmol Bakshi · Set in Playfair & Plex Mono
+© 2026 Anmol Bakshi 
