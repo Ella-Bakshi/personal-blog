@@ -58,3 +58,47 @@
     });
   });
 })();
+
+/* ---------- scroll reveal — mirrors the anmolbakshi.com dossier ---------- */
+(function () {
+  'use strict';
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduce || !('IntersectionObserver' in window)) return;
+
+  document.querySelectorAll('.hero h1, .post-head h1').forEach(function (el) {
+    el.classList.add('reveal-title');
+  });
+  ['.hero-kicker', '.hero-lede', '.hero-sub',
+   '.ticker', '.controls', '.archive-meta',
+   '.post-kicker', '.post-head .standfirst', '.post-byline',
+   '.article', '.fig-rule', '.post-nav'
+  ].forEach(function (sel) {
+    document.querySelectorAll(sel).forEach(function (el) { el.classList.add('reveal'); });
+  });
+  var archive = document.getElementById('archive');
+  if (archive) archive.classList.add('reveal-stagger');
+
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (en) {
+      if (en.isIntersecting) { en.target.classList.add('is-in'); io.unobserve(en.target); }
+    });
+  }, { threshold: 0.01, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal, .reveal-title, .reveal-stagger').forEach(function (el) {
+    io.observe(el);
+  });
+
+  /* Above-the-fold masthead/hero: fade in immediately on load. */
+  requestAnimationFrame(function () {
+    document.querySelectorAll('.hero .reveal-title, .hero .reveal, .ticker.reveal').forEach(function (el, i) {
+      setTimeout(function () { el.classList.add('is-in'); }, 60 + i * 70);
+    });
+  });
+
+  /* Safety net: never leave content hidden if the observer misfires. */
+  setTimeout(function () {
+    document.querySelectorAll('.reveal, .reveal-title, .reveal-stagger').forEach(function (el) {
+      el.classList.add('is-in');
+    });
+  }, 1500);
+})();
